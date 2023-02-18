@@ -1,0 +1,543 @@
+{
+ "Resources": {
+  "CustomBusBBB042B9": {
+   "Type": "AWS::Events::EventBus",
+   "Properties": {
+    "Name": "passive-lake-bus"
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/CustomBus/Resource"
+   }
+  },
+  "CustomBusRule2805DEBA": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "EventBusName": {
+     "Ref": "CustomBusBBB042B9"
+    },
+    "EventPattern": {
+     "detail-type": [
+      "glue catalog passive"
+     ],
+     "source": [
+      "passive.catalog.updates"
+     ],
+     "region": [
+      "us-west-2"
+     ]
+    },
+    "Name": "publish-to-active",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::Join": [
+        "",
+        [
+         "arn:aws:events:us-east-1:",
+         {
+          "Ref": "AWS::AccountId"
+         },
+         ":event-bus/default"
+        ]
+       ]
+      },
+      "Id": "Target0",
+      "RoleArn": {
+       "Fn::GetAtt": [
+        "CustomBusRuleEventsRole0774C933",
+        "Arn"
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/CustomBusRule/Resource"
+   }
+  },
+  "CustomBusRuleEventsRole0774C933": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "events.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/CustomBusRule/EventsRole/Resource"
+   }
+  },
+  "CustomBusRuleEventsRoleDefaultPolicyBA028C44": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "events:PutEvents",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:aws:events:us-east-1:",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":event-bus/default"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "CustomBusRuleEventsRoleDefaultPolicyBA028C44",
+    "Roles": [
+     {
+      "Ref": "CustomBusRuleEventsRole0774C933"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/CustomBusRule/EventsRole/DefaultPolicy/Resource"
+   }
+  },
+  "lambdarole0D0C6BDF": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/AmazonS3FullAccess"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSGlueServiceRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": "events:PutEvents",
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:events:us-east-1:",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":event-bus/*-lake-bus"
+            ]
+           ]
+          },
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:events:us-west-2:",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":event-bus/*-lake-bus"
+            ]
+           ]
+          }
+         ]
+        }
+       ],
+       "Version": "2012-10-17"
+      },
+      "PolicyName": "dr_event_bridge_put"
+     }
+    ],
+    "RoleName": "passive-dr-demo-publish-active-changes-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/lambdarole/Resource"
+   }
+  },
+  "lambdaroleDefaultPolicy75A97119": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sqs:ChangeMessageVisibility",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:ReceiveMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "IncomingQueue2DEF62EA",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "lambdaroleDefaultPolicy75A97119",
+    "Roles": [
+     {
+      "Ref": "lambdarole0D0C6BDF"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/lambdarole/DefaultPolicy/Resource"
+   }
+  },
+  "PublishToTargetCE3DB1F3": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-us-west-2"
+     },
+     "S3Key": "2fe579b432fcf0a635048729ec7c9445bec6fc09210e4b514af04e67f4bfb401.zip"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "lambdarole0D0C6BDF",
+      "Arn"
+     ]
+    },
+    "Environment": {
+     "Variables": {
+      "RECORD_SOURCE": "passive.catalog.updates",
+      "INCOMING_QUEUE": "demo-active-incoming"
+     }
+    },
+    "FunctionName": "dr-demo-publish-active-changes",
+    "Handler": "lambda_function.lambda_handler",
+    "Runtime": "python3.9",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "lambdaroleDefaultPolicy75A97119",
+    "lambdarole0D0C6BDF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/PublishToTarget/Resource",
+    "aws:asset:path": "asset.2fe579b432fcf0a635048729ec7c9445bec6fc09210e4b514af04e67f4bfb401",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "PublishToTargetSqsEventSourceCatalogReplicatePassiveIncomingQueue0A283AF0570D1922": {
+   "Type": "AWS::Lambda::EventSourceMapping",
+   "Properties": {
+    "FunctionName": {
+     "Ref": "PublishToTargetCE3DB1F3"
+    },
+    "BatchSize": 1,
+    "EventSourceArn": {
+     "Fn::GetAtt": [
+      "IncomingQueue2DEF62EA",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/PublishToTarget/SqsEventSource:CatalogReplicatePassiveIncomingQueue0A283AF0/Resource"
+   }
+  },
+  "PublishToSourceADF3947B": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-us-west-2"
+     },
+     "S3Key": "5cd2591fe97102ac454e9033b52b1d94f1504d989e61b08bc414a4192253c92e.zip"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "lambdarole0D0C6BDF",
+      "Arn"
+     ]
+    },
+    "Environment": {
+     "Variables": {
+      "ACTIVE": "False",
+      "SOURCEID": "passive.catalog.updates",
+      "DETAIL_TYPE": "glue catalog passive",
+      "EVENTBUS": "passive-lake-bus"
+     }
+    },
+    "FunctionName": "dr-demo-publish-passive-changes",
+    "Handler": "lambda_function.lambda_handler",
+    "Runtime": "python3.9",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "lambdaroleDefaultPolicy75A97119",
+    "lambdarole0D0C6BDF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/PublishToSource/Resource",
+    "aws:asset:path": "asset.5cd2591fe97102ac454e9033b52b1d94f1504d989e61b08bc414a4192253c92e",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "IncomingQueue2DEF62EA": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 1209600,
+    "QueueName": "demo-active-incoming",
+    "VisibilityTimeout": 300
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/IncomingQueue/Resource"
+   }
+  },
+  "IncomingQueuePolicyD07B62B6": {
+   "Type": "AWS::SQS::QueuePolicy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:SendMessage"
+       ],
+       "Condition": {
+        "ArnEquals": {
+         "aws:SourceArn": {
+          "Fn::GetAtt": [
+           "UpdateCatalogPassiveEED99FD6",
+           "Arn"
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "events.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::GetAtt": [
+         "IncomingQueue2DEF62EA",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Queues": [
+     {
+      "Ref": "IncomingQueue2DEF62EA"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/IncomingQueue/Policy/Resource"
+   }
+  },
+  "UpdateCatalogPassiveEED99FD6": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "EventPattern": {
+     "detail-type": [
+      "glue catalog active"
+     ],
+     "source": [
+      "active.catalog.updates"
+     ],
+     "region": [
+      "us-east-1"
+     ]
+    },
+    "Name": "active-catalog-changes",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "IncomingQueue2DEF62EA",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/UpdateCatalogPassive/Resource"
+   }
+  },
+  "UpdateCatalogActive41B7CA85": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "EventPattern": {
+     "detail-type": [
+      "Glue Data Catalog Database State Change",
+      "Glue Data Catalog Table State Change"
+     ],
+     "source": [
+      "aws.glue"
+     ],
+     "region": [
+      "us-west-2"
+     ]
+    },
+    "Name": "passive-catalog-changes",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "PublishToSourceADF3947B",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/UpdateCatalogActive/Resource"
+   }
+  },
+  "UpdateCatalogActiveAllowEventRuleCatalogReplicatePassivePublishToSource1590244B944E0ADC": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "PublishToSourceADF3947B",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "UpdateCatalogActive41B7CA85",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/UpdateCatalogActive/AllowEventRuleCatalogReplicatePassivePublishToSource1590244B"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/2VQ207DMAz9lr27hg6EeKVovCGN7gOmLDWT1zYZdTKEovw7SToKEi85Fys+R17jwz3ertSnVLrrq4EPGHZO6R6StQ90IeMEwyZj4wWe383CWz9QNjJGYDViaO3Vyri1A+uvLGcWYVDjoVMYXrzRjq3Js4WXvTvrJ02v6nxmc1zS/rlbmkYWSd8iyN1eiVCq+ZQhaWy87sk1SgjkI9V/8+RLr5mU97fdHxkjtCQlDcq2dIvjNfNnEMHYjvAkN5f6Ees11quTMFeTN45HwnbGb+RWj6FaAQAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "CatalogReplicatePassive/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
