@@ -69,8 +69,7 @@ Project Rooe
 ```
 
 ## Authors and acknowledgment
-Sebastian Muah  
-Sushant Bhagat
+
 
 ## License
 For open source projects, say how it is licensed.
