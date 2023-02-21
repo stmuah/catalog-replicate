@@ -15,9 +15,9 @@ The catalog replication utility allows the replication of the catalog from one A
 * Does not resolve database and table name conflicts  
 
 ## Solution 
-This architecture removes some of the limitations of the catalog replication utility and makes it easier to deploy and integrate.  It leverages highly resilient core services, and uses Python instead of Java.  THe initial implementation allows for the configuration of an "active-passive" data lake replication setup and can easily be setup to replicate in a multi-region configuration.
+This architecture removes some of the limitations of the catalog replication utility and makes it easier to deploy and integrate.  It leverages highly resilient core services, and uses Python instead of Java.  The initial implementation allows for the configuration of an "active-passive" data lake replication setup and can easily be setup to replicate in a multi-region configuration.
 
-The replication is near real-time using the AWS EventBridge's eventbus for cross region and cross account messaging and communications.  When activated, the replication occurs for every change to the catalog.  These changes may be triggered from the AWS Console, commandline or API calls from other services such as AWS Glue Crawler.
+The replication is near real-time using the AWS EventBridge's eventbus for cross region and cross account messaging and communications.  When activated, the replication occurs for every change to the catalog.  These changes may be triggered from the AWS Console, command line or API calls from other services such as AWS Glue Crawler.
 
 ### Prerequisites  
 There are no external prerequisites to implement this architecture.  All services are native AWS foundational services:
@@ -32,152 +32,19 @@ There are no external prerequisites to implement this architecture.  All service
 ![](ctiarch.png)
 
 ### Artifacts and Objects
-#### Region A (East)  
-* S3
->> dr-lake-demo-east  
+The solution uses the [AWS CDK](https://aws.amazon.com/cdk/) using Typescript to generate the [AWS CloudFormation](https://aws.amazon.com/cloudformation/) templates for the active and passive deployments.
+* [Active Template](./cdk.out/CatalogReplicateActive.template.json)
+* [Passive Template](./cdk.out/CatalogReplicatePassive.template.json)  
 
-* Glue Crawler  
->> dr-demo-crawler-east
-
-* Glue Catalog  
->> database-x
-
-* Lambdas
->> dr-demo-publish-west-changes  
->> dr-demo-publish-east-changes  
-
-* Queues  
->> demo-west-incoming  
->> dr-east-dlq
-
-* EventBridge  
->> west-catalog-changes (rule)  
-```json
-{
-  "detail-type": ["Glue Catalog East"],
-  "source": ["west.catalog.updates"],
-  "region": ["us-west-2"]
-}
-```
->> east-catalog-changes (rule) --> Lambda (dr-demo-publish-east-changes) [DLQ]
-```json
-{
-  "source": ["aws.glue"],
-  "region": ["us-east-1"],
-  "detail-type": ["Glue Data Catalog Database State Change", "Glue Data Catalog Table State Change"]
-}
-``` 
->> east-lake-bus 
-```json
-{
-  "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "CloudFormation template for EventBridge event bus 'east-lake-bus'",
-  "Resources": {
-    "EventBus": {
-      "Type": "AWS::Events::EventBus",
-      "Properties": {
-        "Name": "east-lake-bus"
-      }
-    },
-    "EventRule0": {
-      "Type": "AWS::Events::Rule",
-      "Properties": {
-        "EventBusName": "east-lake-bus",
-        "EventPattern": {
-          "detail-type": ["Glue Catalog East"],
-          "source": ["east.catalog.updates"],
-          "region": ["us-east-1"]
-        },
-        "Name": "publish-to-west",
-        "State": "ENABLED",
-        "Targets": [{
-          "Id": "Id84f9ab38-43ef-414d-a91d-12cfd97bc006",
-          "Arn": "arn:aws:events:us-west-2:664568786592:event-bus/default",
-          "RoleArn": "arn:aws:iam::664568786592:role/service-role/Amazon_EventBridge_Invoke_Event_Bus_1242915447"
-        }]
-      },
-      "DependsOn": ["EventBus"]
-    }
-  }
-}
-```
-
->> default (bus)
-
-
-
-
-#### Region B (West)  
-* Lambdas
->> dr-demo-publish-west-changes
->> dr-demo-publish-east-changes
-* Queues  
->> demo-east-incoming  
->> dr-west-dlq  
-* Glue Catalog  
->> database-x
-* EventBridge  
->> west-lake-bus (bus)  
-```json
-{
-  "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "CloudFormation template for EventBridge event bus 'west-lake-bus'",
-  "Resources": {
-    "EventBus": {
-      "Type": "AWS::Events::EventBus",
-      "Properties": {
-        "Name": "west-lake-bus"
-      }
-    },
-    "EventRule0": {
-      "Type": "AWS::Events::Rule",
-      "Properties": {
-        "EventBusName": "west-lake-bus",
-        "EventPattern": {
-          "detail-type": ["Glue Catalog West"],
-          "source": ["west.catalog.updates"],
-          "region": ["us-west-2"]
-        },
-        "Name": "publish-to-east",
-        "State": "ENABLED",
-        "Targets": [{
-          "Id": "Iddc45f2d4-8026-4bb8-9f53-11eaecd04aa7",
-          "Arn": "arn:aws:events:us-east-1:664568786592:event-bus/default",
-          "RoleArn": "arn:aws:iam::664568786592:role/service-role/Amazon_EventBridge_Invoke_Event_Bus_1732746282"
-        }]
-      },
-      "DependsOn": ["EventBus"]
-    }
-  }
-}
-```
->> east-catalog-changes (rule)  --> Queue (demo-east-incoming)
-```json
-{
-  "detail-type": ["Glue Catalog East"],
-  "source": ["east.catalog.updates"],
-  "region": ["us-east-1"]
-}
-```
->> west-catalog-changes (rule)  --> Lambda (dr-demo-publish-west-changes)
-```json
-{
-  "source": ["aws.glue"],
-  "region": ["us-west-2"],
-  "detail-type": ["Glue Data Catalog Database State Change", "Glue Data Catalog Table State Change"]
-}
-```
->> default (bus)
-* S3
->> dr-lake-demo-west
-* Glue Crawler  
->> dr-demo-crawler-west
-
+## How to Use this Artifact  
+1. Download and install [Node](https://nodejs.org/en/download/)
+2. Install [AWS CDK](https://aws.amazon.com/getting-started/guides/setup-cdk/module-two/)
+3. Access to the repo on [Github](https://github.com/stmuah/catalog-replicate)
 
 
 
 ## Authors and acknowledgment
-Sebastian Muah  (@sebmuaht)  
+Sebastian Muah  
 Sushant Bhagat
 
 ## License
