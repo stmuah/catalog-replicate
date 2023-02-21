@@ -41,7 +41,32 @@ The solution uses the [AWS CDK](https://aws.amazon.com/cdk/) using Typescript to
 2. Install [AWS CDK](https://aws.amazon.com/getting-started/guides/setup-cdk/module-two/)
 3. Access to the repo on [Github](https://github.com/stmuah/catalog-replicate)
 
+## Project Folder Structure
+```markdown
+Project Rooe
+|--assets [folder containing Lambda functions]
+|  |--active
+|  |  |--active-changes
+|  |      lambda_function.py
+|
+|  |  |--passive-changes
+|        lambda_function.py
+|
+|  |--passive
+|     |--active-changes
+|         lambda_function.py
+|     |--passive-changes
+|        lambda_function.py
+|--bin [folder containing the CDK stack launcher]
+|  catalogreplicate.ts
+|
+|--cdk.out [folder containing the generated templates and artifacts]
+|
+|--lib [folder containing the catalogreplicate stack and classes]
+|  catalogreplicatestack.ts
 
+
+```
 
 ## Authors and acknowledgment
 Sebastian Muah  
